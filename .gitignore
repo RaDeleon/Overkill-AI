@@ -1,0 +1,14 @@
+# Local devlog and working notes (never committed)
+_devlog/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Local environment
+.env
+.env.*
+node_modules/

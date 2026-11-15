@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Find the lightest Claude model and effort level a task needs, and how much of your Pro, Max or Ultra usage limit it uses compared with Opus or Fable.">
+<meta property="og:title" content="Overkill AI Check">
+<meta property="og:description" content="Find the lightest Claude model and effort level a task needs, and how much of your Pro, Max or Ultra usage limit it uses compared with Opus or Fable.">
+<meta property="og:type" content="website">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Overkill AI Check</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: workbench — plan picker in the header, task form left, verdict + usage ledger pinned right */
+:root{
+  --bg:#f3f5f8; --panel:#ffffff; --ink:#151a24; --muted:#5b6475; --line:#d9dee7;
+  --accent:#2a55c9; --accent-soft:#e3eafb;
+  --fit:#1d7a4f; --fit-soft:#dcf1e5; --warn:#a15c00; --warn-soft:#fbecd5; --over:#b3261e; --over-soft:#f9dedb;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f131b; --panel:#171c26; --ink:#e6eaf2; --muted:#9aa3b5; --line:#2a3242;
+  --accent:#7fa2ff; --accent-soft:#1f2a45; --fit:#5fd39a; --fit-soft:#16372a; --warn:#f0b35c; --warn-soft:#3a2c14; --over:#ff8a80; --over-soft:#3d1c1a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f131b; --panel:#171c26; --ink:#e6eaf2; --muted:#9aa3b5; --line:#2a3242;
+  --accent:#7fa2ff; --accent-soft:#1f2a45; --fit:#5fd39a; --fit-soft:#16372a; --warn:#f0b35c; --warn-soft:#3a2c14; --over:#ff8a80; --over-soft:#3d1c1a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px}
+header h1{font:800 clamp(30px,4.4vw,44px)/1.05 var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
+header h1 span{color:var(--over)}
+[hidden]{display:none!important}
+header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.tag{font:600 11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.result{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:860px){.result{position:static}}
+label,.lbl{font-weight:600;font-size:13px;display:block;margin-bottom:6px}
+.hint{font-weight:400;color:var(--muted)}
+textarea,input[type=number],input[type=text],select{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:9px 11px}
+textarea{min-height:92px;resize:vertical}
+textarea:focus,input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:520px){.row2{grid-template-columns:1fr}}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{margin:0;font-weight:500;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;background:var(--bg)}
+.seg input:checked+label{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.seg input:focus-visible+label{outline:2px solid var(--accent)}
+.presets{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.presets span{font-size:13px;color:var(--muted)}
+button{font:600 13px var(--body);border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+button:disabled{opacity:.55;cursor:default}
+button.link{border:0;background:none;padding:2px 4px;color:var(--muted);font-weight:500}
+button.link:hover{color:var(--over)}
+.verdict{display:flex;flex-direction:column;gap:4px}
+.model{font:800 34px/1.05 var(--display);letter-spacing:-.02em}
+.effort{font:600 13px var(--mono);color:var(--muted)}
+.why{margin:0;max-width:60ch}
+.meter{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.meter div{height:8px;border-radius:2px;background:var(--line)}
+.meter div.on{background:var(--accent)}
+.meter-l{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font:600 10px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.pill{display:inline-block;font:600 11px var(--mono);padding:3px 8px;border-radius:999px;letter-spacing:.04em;white-space:nowrap}
+.pill.fit{background:var(--fit-soft);color:var(--fit)}.pill.over{background:var(--over-soft);color:var(--over)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font:600 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+tr.rec td{font-weight:600}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;min-width:50px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar.over i{background:var(--over)}
+.save{font:800 24px/1.15 var(--display);color:var(--fit)}
+.note{font-size:12px;color:var(--muted);margin:0}
+.signals{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.signals div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding-bottom:4px}
+.signals b{font:600 12px var(--mono)}
+.tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px}
+.tools label{font-weight:500;font-size:13px;display:flex;gap:8px;align-items:center;margin:0;cursor:pointer}
+.callout{border-left:3px solid var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:0 6px 6px 0;font-size:13px}
+details{font-size:13px;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.lblrow{display:flex;align-items:center;gap:6px;margin-bottom:6px;position:relative}
+.lblrow .lbl,.lblrow label,.lblrow .tag{margin:0}
+.qbtn{width:22px;height:22px;padding:0;border-radius:50%;font:600 12px/1 var(--mono);color:var(--accent);background:var(--accent-soft);border:1px solid transparent;display:inline-grid;place-items:center;flex:none}
+.qbtn:hover,.qbtn[aria-expanded="true"]{border-color:var(--accent)}
+.pop{position:absolute;top:calc(100% + 6px);left:0;z-index:20;width:min(460px,calc(100vw - 48px));background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(10,20,40,.18);padding:14px 16px;font:400 13px/1.45 var(--body);letter-spacing:0;text-transform:none}
+.pop dl{margin:0;display:flex;flex-direction:column;gap:9px}
+.pop dt{font-weight:600}
+.pop dd{margin:2px 0 0;color:var(--muted)}
+.pop dd i{font-style:normal;color:var(--ink)}
+.pop p{margin:0}
+.pop p+p,.pop dl+p{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+@media (hover:hover){.lblrow:hover .pop{display:block!important}}
+footer{font-size:12px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="tag" id="eyebrow"></div>
+      <h1><span>Overkill</span> AI Check</h1>
+      <p id="lede"></p>
+    </div>
+    <div>
+      <div class="lblrow"><span class="lbl">Your Claude plan</span><button type="button" class="qbtn" data-help="plan" aria-label="About plans">?</button></div>
+      <div class="seg" id="plan"></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <form class="card" id="f" autocomplete="off">
+      <div class="presets" id="presets"><span>Try an example:</span>
+        <button type="button" data-p="contract">Summarize a contract</button>
+        <button type="button" data-p="email">Draft a client email</button>
+        <button type="button" data-p="refactor">Refactor across a repo</button>
+        <button type="button" data-p="agent">Overnight research agent</button>
+      </div>
+
+      <div>
+        <label for="prompt">Your prompt <span class="hint">(stays in your browser; never saved)</span></label>
+        <textarea id="prompt"></textarea>
+      </div>
+      <div>
+        <label for="goal">What you're trying to get done</label>
+        <textarea id="goal" style="min-height:60px"></textarea>
+        <div style="margin-top:8px"><button type="button" id="detect">Suggest fields from my text</button> <span class="hint" style="font-size:12px">rough keyword match; check the picks below</span></div>
+      </div>
+
+      <div>
+        <div class="lblrow"><span class="lbl" id="taskLbl">Type of work</span><button type="button" class="qbtn" data-help="task" aria-label="Which type of work should I pick?">?</button></div>
+        <div class="seg" id="task" aria-labelledby="taskLbl"></div>
+      </div>
+      <div class="row2">
+        <div>
+          <div class="lblrow"><span class="lbl" id="ctxLbl">Material Claude reads</span><button type="button" class="qbtn" data-help="ctx" aria-label="What counts as material?">?</button></div>
+          <div class="seg" id="ctx" aria-labelledby="ctxLbl"></div>
+        </div>
+        <div>
+          <div class="lblrow"><span class="lbl" id="reasonLbl">Reasoning needed</span><button type="button" class="qbtn" data-help="reason" aria-label="How much reasoning?">?</button></div>
+          <div class="seg" id="reason" aria-labelledby="reasonLbl"></div>
+        </div>
+      </div>
+      <div>
+        <div class="lblrow"><span class="lbl" id="stakesLbl">Cost of a wrong answer</span><button type="button" class="qbtn" data-help="stakes" aria-label="How to judge the cost of a wrong answer">?</button></div>
+        <div class="seg" id="stakes" aria-labelledby="stakesLbl"></div>
+      </div>
+      <div>
+        <div class="lblrow"><span class="lbl">Connectors and tools in use</span><button type="button" class="qbtn" data-help="tools" aria-label="Why connectors matter">?</button></div>
+        <div class="tools" id="tools"></div>
+      </div>
+      <div class="row2">
+        <div>
+          <div class="lblrow"><label for="runs">Runs per week</label><button type="button" class="qbtn" data-help="runs" aria-label="About runs per week">?</button></div>
+          <input type="number" id="runs" min="1" step="1">
+        </div>
+        <div>
+          <div class="lblrow"><label for="ctxTok">Material size in tokens <span class="hint">(auto)</span></label><button type="button" class="qbtn" data-help="tokens" aria-label="What is a token?">?</button></div>
+          <input type="number" id="ctxTok" min="0" step="1000">
+        </div>
+      </div>
+    </form>
+
+    <aside class="card result" aria-live="polite">
+      <div class="verdict">
+        <div class="lblrow"><span class="tag">Recommended</span><button type="button" class="qbtn" data-help="effort" aria-label="What are models and effort?">?</button></div>
+        <div class="model" id="m"></div>
+        <div class="effort" id="e"></div>
+      </div>
+      <div>
+        <div class="meter" id="meter"><div></div><div></div><div></div><div></div></div>
+        <div class="meter-l" style="margin-top:4px"><span>Haiku</span><span>Sonnet</span><span>Opus</span><span>Fable</span></div>
+      </div>
+      <p class="why" id="why"></p>
+      <div id="border"></div>
+
+      <div>
+        <div class="tag">Compared with Opus 5.5 high</div>
+        <div class="save" id="save"></div>
+        <p class="note" id="saveSub" style="margin-top:4px"></p>
+      </div>
+      <div>
+        <div class="lblrow"><span class="tag" id="useHead">How much of your limit one run uses</span><button type="button" class="qbtn" data-help="limits" aria-label="How plan limits work">?</button></div>
+        <div class="tbl"><table>
+          <thead id="thead"></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+      </div>
+      <div id="fableNote"></div>
+
+      <details>
+        <summary>How this was scored</summary>
+        <div class="signals" id="sig" style="margin-top:8px"></div>
+      </details>
+      <details>
+        <summary>Assumptions behind the numbers</summary>
+        <ul>
+          <li>Anthropic doesn't publish how big a session or a week is. A Pro 5-hour session is taken as about 45 short messages on a mid-size model; a Pro week as about 15 Pro sessions. Max is 5× Pro for both; Ultra is 10× Pro per week with no 5-hour limit once verified.</li>
+          <li>Models are weighted by their relative compute cost (published API prices), since heavier models use limits faster.</li>
+          <li>Thinking grows with effort; agent and coding work counts several turns, with repeat context at cached weight.</li>
+          <li>Every percentage here is an estimate. The comparisons between models are more reliable than the exact numbers.</li>
+        </ul>
+      </details>
+
+    </aside>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+
+// ---------- Model weights: published API prices, $ per million tokens (Nov 2026) ----------
+const P = {
+  haiku:{name:"Claude Haiku 5.5", in:.10, out:.50, cr:.01, inL:.50, outL:2.50, crL:.05},
+  sonnet:{name:"Claude Sonnet 5.5", in:2, out:10, cr:.10},
+  opus:{name:"Claude Opus 5.5", in:4, out:20, cr:.20},
+  fable:{name:"Claude Fable 5.1", in:10, out:50, cr:.25}
+};
+const TIER = ["haiku","sonnet","opus","fable"];
+const EFFORTS = ["low","medium","high","xhigh","max"];
+const EFF = {low:1,medium:1.4,high:2,xhigh:2.8,max:4};
+const short = m => P[m].name.replace("Claude ","");
+
+// ---------- Plans (claude.com/pricing, Nov 2026) and limit sizes (assumptions; Anthropic doesn't publish exact sizes) ----------
+const PLANS = {
+  pro:{name:"Pro",session:1,week:1},
+  max:{name:"Max",session:5,week:5},
+  ultra:{name:"Ultra",session:null,week:10}  // verified Ultra accounts have no 5-hour limit
+};
+const PRO_SESSION = 45 * (2000*2 + 500*10) / 1e6; // ~45 short mid-size messages
+const PRO_WEEK = PRO_SESSION * 15;                 // assumed: a Pro week ≈ 15 Pro sessions
+
+// ---------- General field definitions: [value, label, score, extra] ----------
+const TASK = [
+  ["read","Read, summarize, extract",0,{turns:1,out:400}],
+  ["rewrite","Rewrite, format, translate",1,{turns:1,out:600}],
+  ["write","Write new content",2,{turns:1,out:800}],
+  ["analysis","Analysis or research",4,{turns:1,out:1000}],
+  ["code","Small code change",4,{turns:2,out:1000}],
+  ["codebig","Multi-file coding",7,{turns:6,out:1500}],
+  ["agent","Long-running agent",10,{turns:15,out:1000}]
+];
+const CTX = [["small","A few lines",0,1500],["doc","A document",0,15000],["large","Many docs / repo",1,90000],["huge","Huge (200K+)",3,250000]];
+const REASON = [["lookup","Straightforward",0],["judgment","Some judgment",1],["multi","Multi-step",3],["hard","Hard / novel",6]];
+const STAKES = [["low","Low",0],["med","Medium",1],["high","High",2]];
+const TOOLS = [ // [id,label,definition tokens,result tokens per use]
+  ["web","Web search",350,3000],["mail","Email / calendar",1800,1500],["drive","Drive / docs",1500,4000],
+  ["chat","Slack / Chat",1500,1500],["git","GitHub",2500,3000],["code","Code execution",1000,1500],
+  ["browser","Browser / computer use",6600,4000]
+];
+const PRESETS = {
+  contract:{prompt:"Read the attached 20-page vendor contract and list the key terms, payment schedule, renewal date and any auto-renew clause.",goal:"Pull the dates and money terms out of a contract so I can put them in our tracker.",task:"read",ctx:"doc",reason:"judgment",stakes:"med",tools:[],runs:5},
+  email:{prompt:"Write a short follow-up email to a client who hasn't replied about the website proposal. One clear ask: a 15-minute call this week.",goal:"Nudge a quiet client without sounding pushy.",task:"write",ctx:"small",reason:"judgment",stakes:"low",tools:["mail"],runs:10},
+  refactor:{prompt:"Migrate the auth module from session cookies to JWT across the API, update the middleware and tests, and keep the existing endpoints working.",goal:"Swap the auth system in a Node codebase without breaking anything.",task:"codebig",ctx:"large",reason:"multi",stakes:"high",tools:["git","code"],runs:1},
+  agent:{prompt:"Research every competitor in a local market, browse their sites and pricing pages, and build a comparison with sources.",goal:"Unattended multi-hour research that browses dozens of sites.",task:"agent",ctx:"large",reason:"hard",stakes:"med",tools:["web","browser","drive"],runs:1}
+};
+
+// ---------- Plain-language help for every field ----------
+const HELP = {
+  plan:`<p>Pick the Claude plan you pay for. Pro and Max have a limit that resets 5 hours after your first message, plus a weekly limit. Ultra has no 5-hour limit once the account is verified, only a weekly one. Max is 5× Pro; Ultra is 10× Pro per week.</p>`,
+  task:`<dl>
+    <dt>Read, summarize, extract</dt><dd>Claude reads something you give it and reports what's in it. <i>Summarize a PDF, list the dates in a contract, answer questions about a document.</i></dd>
+    <dt>Rewrite, format, translate</dt><dd>You already have the text; Claude changes its form. <i>Fix grammar, shorten, change the tone, turn notes into bullets, translate.</i></dd>
+    <dt>Write new content</dt><dd>Claude writes something from scratch. <i>A client email, a proposal, a blog or social post.</i></dd>
+    <dt>Analysis or research</dt><dd>Claude compares, weighs options or finds patterns, then gives a view. <i>Compare three vendors, read survey results, research a topic across sources.</i></dd>
+    <dt>Small code change</dt><dd>One file, script or function. <i>Fix a bug, write a quick script, explain what some code does.</i></dd>
+    <dt>Multi-file coding</dt><dd>Changes across a whole project. <i>A refactor, a migration, a feature that touches many files.</i></dd>
+    <dt>Long-running agent</dt><dd>Claude works on its own for a long stretch, with many steps and tools. <i>Overnight research, browsing dozens of sites, a multi-step automation.</i></dd>
+  </dl><p>Doing a mix? Pick the hardest part. "Summarize these reports, then recommend which vendor to drop" is Analysis, not Read.</p>`,
+  ctx:`<p>Everything Claude has to read for this task: your message plus anything you paste, attach, or a connector pulls in.</p><dl>
+    <dt>A few lines</dt><dd>A question or a short paste. <i>An error message, a paragraph to rewrite.</i></dd>
+    <dt>A document</dt><dd>One file. <i>A 20-page PDF, a long email thread, a spreadsheet tab.</i></dd>
+    <dt>Many docs / repo</dt><dd>Several files or a code project. <i>A folder of reports, a website's code.</i></dd>
+    <dt>Huge (200K+)</dt><dd>Very large sets. <i>A whole codebase, a year of tickets.</i></dd></dl>`,
+  reason:`<dl>
+    <dt>Straightforward</dt><dd>The answer is in the material, or it follows a template. <i>Pull out the dates, reformat a list.</i></dd>
+    <dt>Some judgment</dt><dd>Choosing tone, wording or what matters most. <i>A polite follow-up, a summary for a client.</i></dd>
+    <dt>Multi-step</dt><dd>Several steps that depend on each other; Claude has to plan. <i>Scope a project, migrate a feature, investigate a problem.</i></dd>
+    <dt>Hard / novel</dt><dd>No template exists and getting there is tricky. <i>An unexplained outage, a new system design, a puzzling bug.</i></dd></dl>`,
+  stakes:`<dl>
+    <dt>Low</dt><dd>You'll read it and fix anything off. <i>A first draft, internal notes.</i></dd>
+    <dt>Medium</dt><dd>A client sees it, or a mistake costs time. <i>A client email, a quote, a report.</i></dd>
+    <dt>High</dt><dd>Security, money, legal or a live system is on the line. <i>A security alert, a production deploy, contract terms.</i></dd></dl>`,
+  tools:`<p>Each connector or tool you have switched on adds instructions Claude reads on every turn, and anything it pulls in counts too. They use your limit even when the task doesn't need them.</p><p>Tick only the ones this task actually uses, and turn the others off in Claude while you work.</p>`,
+  runs:`<p>How many times a week you do this kind of task. It turns "per run" into a weekly picture of what picking the right model saves.</p>`,
+  tokens:`<p>Claude reads and writes in tokens, small chunks of text. One token is about ¾ of a word.</p><dl>
+    <dt>Rough sizes</dt><dd>A page of text ≈ 600 tokens. A 20-page PDF ≈ 15,000. A small website's code ≈ 50,000–100,000.</dd></dl><p>This box fills in from your material choice. Change it only if you know the real size.</p>`,
+  effort:`<dl>
+    <dt>Models</dt><dd>Haiku is the lightest and fastest, then Sonnet, then Opus. Fable is the most capable and the most expensive. Heavier models use your limit faster.</dd>
+    <dt>Effort</dt><dd>How long Claude thinks before answering. Low is right for routine work. High helps on hard, multi-step problems. More effort uses more of your limit.</dd></dl><p>The pick here is the lightest setting that should still do the job well.</p>`,
+  limits:`<p>Claude plans don't bill per message. Instead each plan has usage limits, and heavier models, higher effort, long chats and connectors use them up faster.</p><dl>
+    <dt>5-hour session (Pro, Max)</dt><dd>Starts with your first message and resets 5 hours later.</dd>
+    <dt>Weekly limit (all plans)</dt><dd>Resets once a week. On Ultra it's the only limit.</dd></dl><p>You can see your current percentages in Claude's usage settings.</p>`
+};
+
+// ---------- Build the form ----------
+const $ = id => document.getElementById(id);
+const find = (list,v) => list.find(x=>x[0]===v);
+const val = n => document.querySelector(`input[name=${n}]:checked`)?.value;
+function seg(id,list){ $(id).innerHTML = list.map(([v,l])=>`<input type="radio" name="${id}" id="${id}-${v}" value="${v}"><label for="${id}-${v}">${l}</label>`).join(""); }
+seg("task",TASK); seg("ctx",CTX); seg("reason",REASON); seg("stakes",STAKES);
+seg("plan",Object.entries(PLANS).map(([k,p])=>[k,p.name]));
+$("tools").innerHTML = TOOLS.map(([v,l])=>`<label><input type="checkbox" id="tool-${v}" value="${v}">${l}</label>`).join("");
+
+// Help popovers: one open at a time; hover on desktop (CSS), tap or keyboard everywhere
+document.querySelectorAll(".qbtn[data-help]").forEach((b,i)=>{
+  const pop=document.createElement("div"); pop.className="pop"; pop.id="help-"+i; pop.setAttribute("role","note"); pop.hidden=true;
+  pop.innerHTML=HELP[b.dataset.help]||""; b.setAttribute("aria-controls",pop.id); b.setAttribute("aria-expanded","false");
+  b.after(pop);
+  b.addEventListener("click",e=>{ e.stopPropagation(); const open=pop.hidden; closeHelp(); if(open){ pop.hidden=false; b.setAttribute("aria-expanded","true"); } });
+});
+function closeHelp(){ document.querySelectorAll(".pop").forEach(p=>p.hidden=true); document.querySelectorAll(".qbtn").forEach(b=>b.setAttribute("aria-expanded","false")); }
+document.addEventListener("click",e=>{ if(!e.target.closest(".pop")) closeHelp(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ const open=document.querySelector(".qbtn[aria-expanded=true]"); closeHelp(); open&&open.focus(); } });
+
+// Page copy
+$("eyebrow").textContent = "Claude models today · ChatGPT models coming";
+$("lede").textContent = "Describe the task. You get the lightest Claude model and effort level that will do it well, and how much of your plan's limit it uses compared with Opus or Fable at high effort.";
+$("foot").textContent = "Estimates only. Not affiliated with Anthropic.";
+
+let plan = "pro";
+try { const saved = localStorage.getItem("aio-plan"); if (PLANS[saved]) plan = saved; } catch(e) {}
+$(`plan-${plan}`).checked = true;
+$("plan").addEventListener("change", e => { plan = e.target.value; try{localStorage.setItem("aio-plan",plan);}catch(_){} run(); });
+
+let ctxTouched = false;
+function applyFields(p){
+  ["task","ctx","reason","stakes"].forEach(k=>$(`${k}-${p[k]}`).checked=true);
+  TOOLS.forEach(([v])=>$(`tool-${v}`).checked=p.tools.includes(v));
+  $("runs").value=p.runs; ctxTouched=false; $("ctxTok").value=find(CTX,p.ctx)[3];
+}
+function load(p){ $("prompt").value=p.prompt; $("goal").value=p.goal; applyFields(p); run(); }
+
+// ---------- Keyword suggestions from free text (rough helper) ----------
+function detect(){
+  const t = ($("prompt").value+" "+$("goal").value).toLowerCase();
+  const has = (...w) => w.some(x=>t.includes(x));
+  let task="write";
+  if(has("summar","extract","read the","list the","pull out","what does","tl;dr","key points")) task="read";
+  if(has("rewrite","reformat","translate","proofread","fix grammar","shorten","convert")) task="rewrite";
+  if(has("analy","research","compare","evaluate","investigate","troubleshoot")) task="analysis";
+  if(has("bug","function","script","code","api","endpoint","test")) task="code";
+  if(has("refactor","migrate","across the","codebase","repo","multi-file")) task="codebig";
+  if(has("overnight","autonomous","for hours","every competitor","dozens","agent","unattended")) task="agent";
+  let ctx="small";
+  if(has("attached","document","pdf","contract","report","article","transcript")) ctx="doc";
+  if(has("all the","files","codebase","repo","folder","many docs")) ctx="large";
+  if(has("entire codebase","whole repo","hundreds of")) ctx="huge";
+  let reason={read:"lookup",rewrite:"lookup",write:"judgment",analysis:"multi",code:"judgment",codebig:"multi",agent:"hard"}[task];
+  if(has("why","tradeoff","trade-off","strategy","architect","design")) reason=reason==="lookup"?"judgment":"multi";
+  if(has("prove","novel","from scratch","hard","tricky")) reason="hard";
+  let stakes="low";
+  if(has("client","customer","legal","contract","finance","invoice")) stakes="med";
+  if(has("production","security","compliance","medical","without breaking","breach","malware")) stakes="high";
+  $(`task-${task}`).checked=true; $(`ctx-${ctx}`).checked=true; $(`reason-${reason}`).checked=true; $(`stakes-${stakes}`).checked=true;
+  const map={web:["search","web","online","browse"],mail:["email","gmail","calendar","outlook"],drive:["drive","google doc","sharepoint","notion"],chat:["slack","teams","google chat"],git:["github","pull request","repo"],code:["run the","execute","csv","spreadsheet","chart"],browser:["browse","website","click","fill out"]};
+  TOOLS.forEach(([v])=>{ $(`tool-${v}`).checked=map[v].some(w=>t.includes(w)); });
+  if(ctx==="small") $("ctxTok").value=Math.max(500,Math.round($("prompt").value.length/3.5));
+  else if(!ctxTouched) $("ctxTok").value=find(CTX,ctx)[3];
+  run();
+}
+
+// ---------- Rules engine (pure; reused later by the Claude Code mod and app skill) ----------
+function recommend(s){
+  const task=find(TASK,s.task), ctx=find(CTX,s.ctx), reason=find(REASON,s.reason), stakes=find(STAKES,s.stakes);
+  const n=s.tools.length, toolScore=(n===0?0:n<=2?1:2)+(s.tools.includes("browser")?1:0);
+  const parts=[["Type of work",task[1],task[2]],["Material",ctx[1],ctx[2]],["Reasoning",reason[1],reason[2]],["Stakes",stakes[1],stakes[2]],["Tools",n?n+" connected":"none",toolScore]];
+  const score=parts.reduce((a,p)=>a+p[2],0);
+  const BANDS=[[2,"haiku","low"],[5,"sonnet","low"],[8,"sonnet","medium"],[11,"opus","medium"],[15,"opus","high"],[99,"fable","high"]];
+  const band=BANDS.findIndex(b=>score<=b[0]);
+  let [,model,effort]=BANDS[band];
+  const notes=[];
+  if(s.ctx==="huge"&&model==="haiku"){model="sonnet";effort="low";notes.push("Bumped from Haiku: very long material needs stronger recall.");}
+  if(s.task==="agent"&&TIER.indexOf(model)<2){model="opus";effort="medium";notes.push("Long-running agents need Opus-class reliability across many steps.");}
+  const next=BANDS[band+1], prevMax=band>0?BANDS[band-1][0]:-1;
+  let border=null;
+  if(next&&score>=BANDS[band][0]-1&&next[1]!==model) border=`Close to the line. Start here; if the output misses, step up to ${short(next[1])} at ${next[2]} effort.`;
+  else if(score<=prevMax+1&&band>0&&BANDS[band-1][1]!==model) border=`Close to the line. ${short(BANDS[band-1][1])} may handle it too. Worth a test run.`;
+  return {model,effort,score,parts,notes,border};
+}
+function why(r){
+  const m={haiku:"Haiku handles reading, extraction and simple rewrites while barely touching your limits. Bigger models give the same answer here.",
+    sonnet:"Sonnet covers writing, everyday analysis and normal coding. Opus would rarely change the result for this task.",
+    opus:"This has enough steps, judgment or risk that Opus earns the extra usage: fewer misses and less rework.",
+    fable:"Hard reasoning over a long, multi-step job is where Fable pulls ahead. This one qualifies."}[r.model];
+  const e={low:"Low effort: the task doesn't need extended thinking.",medium:"Medium effort: some planning helps.",high:"High effort: worth the extra thinking."}[r.effort];
+  return m+" "+e+(r.notes.length?" "+r.notes.join(" "):"");
+}
+
+// ---------- Usage model: compute-weighted units → share of a session or week ----------
+function units(model,effort,s){
+  const p=P[model], task=find(TASK,s.task);
+  const tools=s.tools.map(v=>find(TOOLS,v));
+  const promptTok=Math.max(50,Math.round(($("prompt").value||"").length/3.5));
+  const ctxTok=+$("ctxTok").value||0;
+  const defTok=tools.reduce((a,t)=>a+t[2],0)+(tools.length?286:0);
+  const turns=task[3].turns+Math.min(tools.length,3);
+  const toolRes=tools.length?tools.reduce((a,t)=>a+t[3],0)/tools.length:0;
+  const outPer=Math.round(task[3].out*EFF[effort]);
+  let u=0, input=promptTok+ctxTok+defTok, history=input;
+  for(let i=0;i<turns;i++){
+    const long=model==="haiku"&&history>100000;
+    const inP=long?p.inL:p.in, outP=long?p.outL:p.out, crP=long?p.crL:p.cr;
+    const fresh=i===0?input:(toolRes+outPer), cached=i===0?0:history-fresh;
+    u+=(fresh*inP+cached*crP+outPer*outP)/1e6;
+    history+=outPer+toolRes;
+  }
+  return u;
+}
+const sessPct = (u,m,pk=plan) => PLANS[pk].session ? u/(PRO_SESSION*PLANS[pk].session)*100 : null;
+const weekPct = (u,m,pk=plan) => u/(PRO_WEEK*PLANS[pk].week)*100;
+const mainPct = (u,m,pk=plan) => PLANS[pk].session ? sessPct(u,m,pk) : weekPct(u,m,pk);
+function fmtUse(pct,unit){
+  if(pct>=100) return (pct/100).toFixed(pct>=1000?0:1)+" "+unit+"s";
+  if(pct<0.1) return "<0.1%";
+  return (pct<10?pct.toFixed(1):Math.round(pct))+"%";
+}
+
+// ---------- Render the result ----------
+function state(){ return {task:val("task"),ctx:val("ctx"),reason:val("reason"),stakes:val("stakes"),tools:TOOLS.map(t=>t[0]).filter(v=>$(`tool-${v}`).checked),runs:Math.max(1,+$("runs").value||1)}; }
+
+function run(){
+  const s=state(); if(!s.task||!s.ctx||!s.reason||!s.stakes) return;
+  const r=recommend(s), pl=PLANS[plan], hasSess=!!pl.session;
+  $("m").textContent=P[r.model].name; $("e").textContent=`effort: ${r.effort}  ·  score ${r.score}`;
+  [...$("meter").children].forEach((d,i)=>d.classList.toggle("on",i<=TIER.indexOf(r.model)));
+  $("why").textContent=why(r);
+  $("border").innerHTML=r.border?`<div class="callout">${r.border}</div>`:"";
+  $("useHead").textContent=`Rough share of your ${pl.name} limit per run`;
+  $("thead").innerHTML=`<tr><th>Setting</th>${hasSess?"<th>5-hr session</th>":""}<th>Week</th><th style="width:26%"></th><th></th></tr>`;
+  const rows=[[r.model,r.effort,true],["opus","high"],["fable","high"]];
+  const seen=new Set(), recU=units(r.model,r.effort,s), recMain=mainPct(recU,r.model);
+  let opusU=null;
+  $("rows").innerHTML=rows.map(([m,e,rec])=>{
+    const u=units(m,e,s); if(m==="opus"&&e==="high") opusU=u;
+    const key=m+e; if(!rec&&seen.has(key)) return ""; seen.add(key);
+    const main=mainPct(u,m), heavier=TIER.indexOf(m)>TIER.indexOf(r.model);
+    const tag=rec?`<span class="pill fit">fits</span>`:heavier?`<span class="pill over">${Math.max(1,main/recMain).toFixed(1)}× usage</span>`:`<span class="pill warn">lighter, may miss</span>`;
+    const proFable = m==="fable"&&plan==="pro";
+    return `<tr class="${rec?"rec":""}"><td>${short(m)} ${e}</td>${hasSess?`<td>${proFable?"credits":fmtUse(sessPct(u,m),"session")}</td>`:""}<td>${proFable?"credits":fmtUse(weekPct(u,m),"week")}</td><td><div class="bar ${main>=100?"over":""}"><i style="width:${proFable?0:Math.min(100,main)}%"></i></div></td><td>${tag}</td></tr>`;
+  }).join("");
+  const unit=hasSess?"session":"week";
+  const opusX=(opusU)/(recU);
+  const perRun=mainPct(opusU,"opus")-recMain, perWeek=(weekPct(opusU,"opus")-weekPct(recU,r.model))*s.runs;
+  const est="Percentages are rough estimates; the comparison is the reliable part.";
+  if(r.model==="fable"){
+    $("save").textContent="Fable is the right call here";
+    $("saveSub").textContent=`It uses about ${(1/opusX).toFixed(1)}× what Opus 5.5 high would, and this task needs the extra. ${est}`;
+  } else if(perRun>0.05){
+    $("save").textContent=`Opus 5.5 high uses about ${opusX.toFixed(1)}× what this task needs`;
+    $("saveSub").textContent=`Roughly ${fmtUse(perRun,unit)} of a ${unit} saved per run, ${fmtUse(perWeek,"week")} of your week at ${s.runs} run${s.runs>1?"s":""}. ${est}`;
+  } else {
+    $("save").textContent="Opus 5.5 high is the right call here";
+    $("saveSub").textContent=est;
+  }
+  const fableRec = r.model==="fable";
+  $("fableNote").innerHTML = plan==="pro"
+    ? `<div class="callout">${fableRec?"This task calls for Fable. ":""}On Pro, Fable is paid for with usage credits, on top of your plan. ${fableRec?"Opus 5.5 high is the closest model your plan covers.":"Lighter models are covered by your plan."}</div>`
+    : fableRec
+      ? `<div class="callout">On ${pl.name}, Fable can use at most half of your weekly limit. This task is a good use of it; keep everyday work on lighter models so it lasts.</div>`
+      : `<p class="note">On ${pl.name}, Fable can use at most half of your weekly limit. Using it here would spend that scarce half on work a lighter model can do.</p>`;
+  $("sig").innerHTML=r.parts.map(p=>`<div><span>${p[0]}: ${p[1]}</span><b>+${p[2]}</b></div>`).join("")+`<div><span>Total</span><b>${r.score}</b></div>`;
+}
+
+$("f").addEventListener("input",e=>{
+  if(e.target.id==="ctxTok") ctxTouched=true;
+  if(e.target.name==="ctx"&&!ctxTouched) $("ctxTok").value=find(CTX,e.target.value)[3];
+  run();
+});
+$("f").addEventListener("submit",e=>e.preventDefault());
+document.querySelectorAll("[data-p]").forEach(b=>b.addEventListener("click",()=>load(PRESETS[b.dataset.p])));
+$("detect").addEventListener("click",detect);
+
+// ---------- Start ----------
+load(PRESETS.contract);
+</script>
+
+</body>
+</html>
