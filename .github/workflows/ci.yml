@@ -1,0 +1,49 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No keys or AI service calls
+        run: |
+          if grep -nEi 'openrouter|api[_-]?key|x-api-key|sk-ant|sk-[A-Za-z0-9]{20,}|api\.(anthropic|openai)\.com' index.html; then
+            echo "Found something that looks like a key or an AI service call." >&2
+            exit 1
+          fi
+
+      - name: Only Google Fonts as outside requests
+        run: |
+          urls=$(grep -oE 'https?://[^"'"'"' )>]+' index.html | grep -vE '^https?://(fonts\.googleapis\.com|fonts\.gstatic\.com)' | grep -vE '^https?://(www\.)?w3\.org' || true)
+          if [ -n "$urls" ]; then
+            echo "Unexpected outside URLs:" >&2
+            echo "$urls" >&2
+            exit 1
+          fi
+
+      - name: Page loads without errors
+        run: |
+          npm install --no-save playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          cat > check.js <<'JS'
+          const { chromium } = require('playwright');
+          (async () => {
+            const b = await chromium.launch();
+            const p = await b.newPage();
+            const errors = [];
+            p.on('pageerror', e => errors.push(e.message));
+            await p.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
+            await p.goto('file://' + process.cwd() + '/index.html');
+            const text = await p.textContent('body');
+            if (!/Recommended/i.test(text)) errors.push('No recommendation shown');
+            await b.close();
+            if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
+          })();
+          JS
+          node check.js
